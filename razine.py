@@ -89,3 +89,38 @@ class Bars(Feature):     sprite_key = "resetke"
 class Paper(Feature):    sprite_key = "papir"
 class Exit(Feature):     sprite_key = "zastava"
 class Tree(Feature):     sprite_key = "drvo"
+
+class SeaArea:
+    sprite_key: ClassVar[str] = "voda"
+    def __init__(self, top_left: Pos, width_cells: int, height_cells: int):
+        self.top_left = top_left
+        self.width_cells = width_cells
+        self.height_cells = height_cells
+
+    def cells(self) -> Iterable[Pos]:
+        for dy in range(self.height_cells):
+            for dx in range(self.width_cells):
+                yield Pos(self.top_left.x + dx, self.top_left.y + dy)
+
+    def contains(self, p: Pos) -> bool:
+        return (
+            self.top_left.x <= p.x < self.top_left.x + self.width_cells
+            and self.top_left.y <= p.y < self.top_left.y + self.height_cells
+        )
+
+def build_level():
+    start = Pos(5, 0)
+    player = Player(start)
+    features: list[Feature] = [
+        Door(Pos(2, 7)),
+        Key(Pos(6, 6)),
+        Paper(Pos(0, 9)),
+        Axe(Pos(3, 12)),
+        Tree(Pos(5, 13)),
+        Bars(Pos(7, 15)),
+        Exit(Pos(7, 16)),
+        Terminal(Pos(7, 14)),
+        Terminal(Pos(10, 15)),
+    ]
+    sea = SeaArea(top_left=Pos(9, 7), width_cells=1, height_cells=4)
+    return player, features, sea, start
