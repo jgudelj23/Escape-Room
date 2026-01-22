@@ -1,5 +1,6 @@
 import pygame
-from razine import Pos, GameMap, build_walkable
+from pathlib import Path
+from razine import Pos, GameMap, build_walkable, build_level
 
 pygame.init()
 
@@ -14,8 +15,28 @@ COLOR_WALK = (255, 255, 255)
 COLOR_WALL = (55, 55, 55)
 GRID_COLOR = (0, 0, 0)
 
+asset_dir = Path(__file__).parent / "slike"
+
+def load_sprite(name):
+    fp = asset_dir / f"{name}.png"
+    if not fp.exists():
+        return None
+    img = pygame.image.load(str(fp)).convert_alpha()
+    return pygame.transform.smoothscale(img, (CELL, CELL))
+
+sprites = {k: load_sprite(k) for k in (
+    "igrac", "vrata", "kljuc", "sjekira", "terminal", "resetke",
+    "papir", "zastava", "drvo", "voda", "most"
+)}
+
+def blit_cell(key, p: Pos):
+    spr = sprites.get(key)
+    if spr:
+        screen.blit(spr, (p.x * CELL, p.y * CELL))
+
 walkable = build_walkable()
 game_map = GameMap(W, H, walkable)
+player, features, sea, start_pos = build_level()
 
 def draw_tiles():
     for y in range(H):
@@ -33,6 +54,10 @@ while running:
             running = False
 
     draw_tiles()
+    for f in features:
+        blit_cell(f.sprite_key, f.pos)
+    blit_cell("igrac", player.pos)
+
     pygame.display.flip()
     clock.tick(60)
 
