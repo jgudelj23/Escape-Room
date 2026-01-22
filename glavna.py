@@ -107,6 +107,10 @@ exit_start_ms = 0
 confetti = []
 game_finished = False
 
+graf = {}
+for p in walkable:
+    graf[p] = [Pos(p.x + dx, p.y + dy) for dx, dy in DIRS4 if Pos(p.x + dx, p.y + dy) in walkable]
+
 def try_collect():
     global has_paper, mode
     if game_finished:
