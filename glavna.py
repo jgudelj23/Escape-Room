@@ -256,14 +256,19 @@ auto_subpath = []
 auto_target = None
 auto_last_step = 0
 
+auto_code_active = False
+auto_code_i = 0
+auto_code_next = 0
+
 def stop_auto():
-    global auto_active, auto_kind, auto_targets, auto_parent, auto_subpath, auto_target
+    global auto_active, auto_kind, auto_targets, auto_parent, auto_subpath, auto_target, auto_code_active
     auto_active = False
     auto_kind = None
     auto_targets = []
     auto_parent = {}
     auto_subpath = []
     auto_target = None
+    auto_code_active = False
 
 def dfs_restart_from_here():
     global auto_targets, auto_parent, auto_subpath, auto_target, auto_last_step
@@ -434,6 +439,44 @@ def start_auto_astar():
     popup.show("A* pretraživanje", 1500)
     astar_replan()
 
+def auto_try_terminal():
+    global mode, code_input, auto_code_active, auto_code_i, auto_code_next
+    if game_finished:
+        return
+    f = feat_at.get(player.pos)
+    if isinstance(f, Terminal) and has_paper and not terminal_unlocked:
+        mode = MODE_CODE
+        code_input = ""
+        auto_code_active = True
+        auto_code_i = 0
+        auto_code_next = pygame.time.get_ticks() + AUTO_CODE_STEP_MS
+        popup.show("Upisivanje šifre", 1500)
+
+def auto_type_code():
+    global terminal_unlocked, mode, code_input, auto_code_active, auto_code_i, auto_code_next
+    if game_finished:
+        auto_code_active = False
+        return
+    if not auto_code_active or mode != MODE_CODE:
+        auto_code_active = False
+        return
+    now = pygame.time.get_ticks()
+    if now < auto_code_next:
+        return
+    if auto_code_i < len(SECRET_CODE):
+        code_input += SECRET_CODE[auto_code_i]
+        auto_code_i += 1
+        auto_code_next = now + AUTO_CODE_STEP_MS
+        return
+    terminal_unlocked = True
+    auto_code_active = False
+    popup.show("Uspješno upisana lozinka. Rešetka je podignuta", 1400)
+    mode = MODE_PLAY
+    if auto_active and auto_kind == "dfs":
+        dfs_restart_from_here()
+    if auto_active and auto_kind == "astar":
+        astar_replan()
+
 def update_auto():
     global auto_last_step, auto_subpath, auto_target
 
@@ -459,6 +502,7 @@ def update_auto():
         auto_subpath.pop(0)
         player.pos = nxt
         try_collect(player.pos)
+        auto_try_terminal()
 
         if auto_target == player.pos and auto_active and auto_kind == "astar":
             astar_replan()
@@ -486,6 +530,7 @@ def update_auto():
     auto_subpath.pop(0)
     player.pos = nxt
     try_collect(player.pos)
+    auto_try_terminal()
     if auto_target == player.pos:
         auto_target = None
 
@@ -557,6 +602,7 @@ def move(dx: int, dy: int):
         return
     player.pos = np
     try_collect(player.pos)
+    auto_try_terminal()
 
 try_collect(player.pos)
 
@@ -573,6 +619,7 @@ while running:
         if e.key == pygame.K_ESCAPE:
             if mode in (MODE_PAPER, MODE_CODE):
                 mode = MODE_PLAY
+                auto_code_active = False
             else:
                 running = False
             continue
@@ -600,20 +647,21 @@ while running:
             continue
 
         if mode == MODE_CODE:
-            if e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
-                if code_input == SECRET_CODE:
-                    terminal_unlocked = True
-                    popup.show("Uspješno upisana lozinka. Rešetka je podignuta")
-                    mode = MODE_PLAY
-                    if auto_active and auto_kind == "astar":
-                        astar_replan()
-                else:
-                    popup.show("Kriva lozinka, pokušaj opet", 1700)
-                    code_input = ""
-            elif e.key == pygame.K_BACKSPACE:
-                code_input = code_input[:-1]
-            elif len(code_input) < len(SECRET_CODE) and e.unicode.isdigit():
-                code_input += e.unicode
+            if not auto_code_active:
+                if e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                    if code_input == SECRET_CODE:
+                        terminal_unlocked = True
+                        popup.show("Uspješno upisana lozinka. Rešetka je podignuta")
+                        mode = MODE_PLAY
+                        if auto_active and auto_kind == "astar":
+                            astar_replan()
+                    else:
+                        popup.show("Kriva lozinka, pokušaj opet", 1700)
+                        code_input = ""
+                elif e.key == pygame.K_BACKSPACE:
+                    code_input = code_input[:-1]
+                elif len(code_input) < len(SECRET_CODE) and e.unicode.isdigit():
+                    code_input += e.unicode
             continue
 
         if mode == MODE_PLAY:
@@ -627,6 +675,7 @@ while running:
                 move(1, 0)
 
     update_auto()
+    auto_type_code()
 
     if mode == MODE_EXIT:
         update_exit_animation()
