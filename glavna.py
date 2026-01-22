@@ -1,3 +1,4 @@
+import random
 import pygame
 from pathlib import Path
 from collections import deque
@@ -102,8 +103,14 @@ bridge_built = terminal_unlocked = False
 mode = MODE_PLAY
 code_input = ""
 
+exit_start_ms = 0
+confetti = []
+game_finished = False
+
 def try_collect():
     global has_paper, mode
+    if game_finished:
+        return
     f = feat_at.get(player.pos)
     if isinstance(f, Paper):
         has_paper = True
@@ -138,7 +145,7 @@ def draw_paper():
     screen.blit(F(26).render("SPACE/ENTER/ESC za zatvoriti", True, (255, 255, 255)), (20, sh - 30))
 
 def move(dx: int, dy: int):
-    if mode != MODE_PLAY:
+    if mode != MODE_PLAY or game_finished:
         return
     np = Pos(player.pos.x + dx, player.pos.y + dy)
     if not game_map.in_bounds(np):
@@ -167,19 +174,23 @@ while running:
                 running = False
             continue
 
+        if game_finished:
+            continue
+
         if mode == MODE_PAPER:
             if e.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_KP_ENTER):
                 mode = MODE_PLAY
             continue
 
-        if e.key in (pygame.K_w, pygame.K_UP):
-            move(0, -1)
-        elif e.key in (pygame.K_s, pygame.K_DOWN):
-            move(0, 1)
-        elif e.key in (pygame.K_a, pygame.K_LEFT):
-            move(-1, 0)
-        elif e.key in (pygame.K_d, pygame.K_RIGHT):
-            move(1, 0)
+        if mode == MODE_PLAY:
+            if e.key in (pygame.K_w, pygame.K_UP):
+                move(0, -1)
+            elif e.key in (pygame.K_s, pygame.K_DOWN):
+                move(0, 1)
+            elif e.key in (pygame.K_a, pygame.K_LEFT):
+                move(-1, 0)
+            elif e.key in (pygame.K_d, pygame.K_RIGHT):
+                move(1, 0)
 
     draw_tiles()
 
