@@ -111,11 +111,100 @@ graf = {}
 for p in walkable:
     graf[p] = [Pos(p.x + dx, p.y + dy) for dx, dy in DIRS4 if Pos(p.x + dx, p.y + dy) in walkable]
 
-def try_collect():
+def bfs_tree(start: Pos):
+    q = deque([start])
+    vis = {start}
+    parent = {start: None}
+    order = []
+    while q:
+        u = q.popleft()
+        order.append(u)
+        for v in graf.get(u, []):
+            if v not in vis:
+                vis.add(v)
+                parent[v] = u
+                q.append(v)
+    return order, parent
+
+def dfs_tree(start: Pos):
+    st = [start]
+    vis = set()
+    parent = {start: None}
+    order = []
+    while st:
+        u = st.pop()
+        if u in vis:
+            continue
+        vis.add(u)
+        order.append(u)
+        for v in reversed(graf.get(u, [])):
+            if v not in vis:
+                parent.setdefault(v, u)
+                st.append(v)
+    return order, parent
+
+def tree_path_between(a: Pos, b: Pos, parent):
+    if a == b:
+        return []
+    anc = set()
+    x = a
+    while x is not None:
+        anc.add(x)
+        x = parent.get(x)
+
+    path_b = []
+    y = b
+    while y not in anc and y is not None:
+        path_b.append(y)
+        y = parent.get(y)
+
+    lca = y
+    if lca is None:
+        return []
+
+    up = []
+    x = a
+    while x != lca and x is not None:
+        x = parent.get(x)
+        if x is None:
+            return []
+        up.append(x)
+
+    return up + list(reversed(path_b))
+
+def is_sea(p: Pos):
+    return sea.contains(p)
+
+def manhattan(a: Pos, b: Pos):
+    return abs(a.x - b.x) + abs(a.y - b.y)
+
+def find_positions(cls):
+    return [f.pos for f in features if isinstance(f, cls)]
+
+def find_first(cls):
+    for f in features:
+        if isinstance(f, cls):
+            return f.pos
+    return None
+
+def nearest(cls):
+    pts = find_positions(cls)
+    return min(pts, key=lambda p: manhattan(player.pos, p)) if pts else None
+
+def nearest_sea_entry():
+    entries = []
+    for sc in sea.cells():
+        for dx, dy in DIRS4:
+            if Pos(sc.x + dx, sc.y + dy) in walkable:
+                entries.append(sc)
+                break
+    return min(entries, key=lambda p: manhattan(player.pos, p)) if entries else None
+
+def try_collect(p: Pos):
     global has_paper, mode
     if game_finished:
         return
-    f = feat_at.get(player.pos)
+    f = feat_at.get(p)
     if isinstance(f, Paper):
         has_paper = True
         remove_feature(f)
@@ -144,7 +233,7 @@ def draw_paper():
     iw, ih = paper_original.get_size()
     sc = min((sw * 0.92) / iw, (sh * 0.92) / ih)
     nw, nh = int(iw * sc), int(ih * sc)
-    big = pygame.transform.scale(paper_original, (nw, nh))
+    big = pygame.transform.smoothscale(paper_original, (nw, nh))
     screen.blit(big, ((sw - nw) // 2, (sh - nh) // 2))
     screen.blit(F(26).render("SPACE/ENTER/ESC za zatvoriti", True, (255, 255, 255)), (20, sh - 30))
 
@@ -157,9 +246,9 @@ def move(dx: int, dy: int):
     if not game_map.tile_at(np).walkable:
         return
     player.pos = np
-    try_collect()
+    try_collect(player.pos)
 
-try_collect()
+try_collect(player.pos)
 
 running = True
 while running:
@@ -172,13 +261,10 @@ while running:
             continue
 
         if e.key == pygame.K_ESCAPE:
-            if mode == MODE_PAPER:
+            if mode in (MODE_PAPER, MODE_CODE):
                 mode = MODE_PLAY
             else:
                 running = False
-            continue
-
-        if game_finished:
             continue
 
         if mode == MODE_PAPER:
@@ -186,15 +272,14 @@ while running:
                 mode = MODE_PLAY
             continue
 
-        if mode == MODE_PLAY:
-            if e.key in (pygame.K_w, pygame.K_UP):
-                move(0, -1)
-            elif e.key in (pygame.K_s, pygame.K_DOWN):
-                move(0, 1)
-            elif e.key in (pygame.K_a, pygame.K_LEFT):
-                move(-1, 0)
-            elif e.key in (pygame.K_d, pygame.K_RIGHT):
-                move(1, 0)
+        if e.key in (pygame.K_w, pygame.K_UP):
+            move(0, -1)
+        elif e.key in (pygame.K_s, pygame.K_DOWN):
+            move(0, 1)
+        elif e.key in (pygame.K_a, pygame.K_LEFT):
+            move(-1, 0)
+        elif e.key in (pygame.K_d, pygame.K_RIGHT):
+            move(1, 0)
 
     draw_tiles()
 
