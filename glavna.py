@@ -1,6 +1,6 @@
 import pygame
 from pathlib import Path
-from razine import Pos, GameMap, build_walkable, build_level
+from razine import Pos, GameMap, build_walkable, build_level, Key
 
 pygame.init()
 
@@ -67,6 +67,8 @@ player, features, sea, start_pos = build_level()
 
 sea_big = scale_sprite(sprites.get("voda"), sea.width_cells, sea.height_cells)
 
+has_key = False
+
 def draw_tiles():
     for y in range(H):
         for x in range(W):
@@ -76,6 +78,14 @@ def draw_tiles():
             pygame.draw.rect(screen, color, r)
             pygame.draw.rect(screen, GRID_COLOR, r, 1)
 
+def try_collect():
+    global has_key
+    for f in features[:]:
+        if f.pos == player.pos and isinstance(f, Key):
+            features.remove(f)
+            has_key = True
+            popup.show("Uzeo si ključ")
+
 def move(dx, dy):
     np = Pos(player.pos.x + dx, player.pos.y + dy)
     if not game_map.in_bounds(np):
@@ -84,6 +94,7 @@ def move(dx, dy):
         popup.show("Ne možeš proći")
         return
     player.pos = np
+    try_collect()
 
 running = True
 while running:
