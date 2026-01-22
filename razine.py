@@ -75,3 +75,17 @@ def build_walkable() -> set[Pos]:
     b.add_horizontal(15, 7, 10)
 
     return b.walkable
+class Feature:
+    sprite_key: ClassVar[str] = ""
+    def __init__(self, pos: Pos):
+        self.pos = pos
+
+class Player(Feature):   sprite_key = "igrac"
+class Door(Feature):     sprite_key = "vrata"
+class Key(Feature):      sprite_key = "kljuc"
+class Axe(Feature):      sprite_key = "sjekira"
+class Terminal(Feature): sprite_key = "terminal"
+class Bars(Feature):     sprite_key = "resetke"
+class Paper(Feature):    sprite_key = "papir"
+class Exit(Feature):     sprite_key = "zastava"
+class Tree(Feature):     sprite_key = "drvo"
