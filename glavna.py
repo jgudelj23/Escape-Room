@@ -2,7 +2,10 @@ import pygame
 from pathlib import Path
 from collections import deque
 
-from razine import Pos, GameMap, build_walkable, build_level, Feature, Paper
+from razine import (
+    Pos, GameMap, build_walkable, build_level,
+    Feature, Door, Key, Axe, Paper, Tree, Exit, Terminal, Bars
+)
 
 pygame.init()
 
@@ -56,7 +59,7 @@ def F(size: int):
 
 asset_dir = Path(__file__).parent / "slike"
 
-def load_sprite(name):
+def load_sprite(name: str):
     fp = asset_dir / f"{name}.png"
     if not fp.exists():
         return None
@@ -76,7 +79,7 @@ pp = asset_dir / "papir.png"
 if pp.exists():
     paper_original = pygame.image.load(str(pp)).convert_alpha()
 
-def blit_cell(key, p: Pos):
+def blit_cell(key: str, p: Pos):
     spr = sprites.get(key)
     if spr:
         screen.blit(spr, (p.x * CELL, p.y * CELL))
@@ -94,9 +97,23 @@ def remove_feature(f: Feature):
         features.remove(f)
         feat_at.pop(f.pos, None)
 
+has_key = has_axe = has_wood = has_paper = False
+bridge_built = terminal_unlocked = False
 mode = MODE_PLAY
-has_paper = False
-bridge_built = False
+code_input = ""
+
+def try_collect():
+    global has_paper, mode
+    f = feat_at.get(player.pos)
+    if isinstance(f, Paper):
+        has_paper = True
+        remove_feature(f)
+        mode = MODE_PAPER
+
+def draw_dim(alpha=190):
+    s = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+    s.fill((0, 0, 0, alpha))
+    screen.blit(s, (0, 0))
 
 def draw_tiles():
     for y in range(H):
@@ -106,30 +123,6 @@ def draw_tiles():
             r = pygame.Rect(x * CELL, y * CELL, CELL, CELL)
             pygame.draw.rect(screen, color, r)
             pygame.draw.rect(screen, GRID_COLOR, r, 1)
-
-def try_collect():
-    global mode, has_paper
-    f = feat_at.get(player.pos)
-    if f and isinstance(f, Paper):
-        remove_feature(f)
-        has_paper = True
-        mode = MODE_PAPER
-
-def move(dx, dy):
-    if mode != MODE_PLAY:
-        return
-    np = Pos(player.pos.x + dx, player.pos.y + dy)
-    if not game_map.in_bounds(np):
-        return
-    if not game_map.tile_at(np).walkable:
-        return
-    player.pos = np
-    try_collect()
-
-def draw_dim(alpha=190):
-    s = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
-    s.fill((0, 0, 0, alpha))
-    screen.blit(s, (0, 0))
 
 def draw_paper():
     draw_dim()
@@ -143,6 +136,17 @@ def draw_paper():
     big = pygame.transform.scale(paper_original, (nw, nh))
     screen.blit(big, ((sw - nw) // 2, (sh - nh) // 2))
     screen.blit(F(26).render("SPACE/ENTER/ESC za zatvoriti", True, (255, 255, 255)), (20, sh - 30))
+
+def move(dx: int, dy: int):
+    if mode != MODE_PLAY:
+        return
+    np = Pos(player.pos.x + dx, player.pos.y + dy)
+    if not game_map.in_bounds(np):
+        return
+    if not game_map.tile_at(np).walkable:
+        return
+    player.pos = np
+    try_collect()
 
 try_collect()
 
