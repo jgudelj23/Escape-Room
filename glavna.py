@@ -201,7 +201,7 @@ def nearest_sea_entry():
     return min(entries, key=lambda p: manhattan(player.pos, p)) if entries else None
 
 def try_collect(p: Pos):
-    global has_key, has_paper, mode
+    global has_key, has_axe, has_wood, has_paper, mode
     if game_finished:
         return
     f = feat_at.get(p)
@@ -212,6 +212,21 @@ def try_collect(p: Pos):
         has_key = True
         remove_feature(f)
         popup.show("Ključ pokupljen")
+        return
+
+    if isinstance(f, Axe):
+        has_axe = True
+        remove_feature(f)
+        popup.show("Sjekira pokupljena")
+        return
+
+    if isinstance(f, Tree):
+        if not has_axe:
+            popup.show("Treba ti sjekira da posiječeš drvo")
+            return
+        has_wood = True
+        remove_feature(f)
+        popup.show("Posijekao si drvo za most")
         return
 
     if isinstance(f, Paper):
