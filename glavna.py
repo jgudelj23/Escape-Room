@@ -86,9 +86,11 @@ game_map = GameMap(W, H, walkable)
 player, features, sea, start_pos = build_level()
 
 sea_big = scale_sprite(sprites.get("voda"), sea.width_cells, sea.height_cells)
+bridge_big = scale_sprite(sprites.get("most"), sea.width_cells, sea.height_cells)
 
 mode = MODE_PLAY
 has_paper = False
+bridge_built = False
 
 def draw_tiles():
     for y in range(H):
@@ -172,8 +174,9 @@ while running:
 
     draw_tiles()
 
-    if sea_big:
-        screen.blit(sea_big, (sea.top_left.x * CELL, sea.top_left.y * CELL))
+    img = bridge_big if bridge_built else sea_big
+    if img:
+        screen.blit(img, (sea.top_left.x * CELL, sea.top_left.y * CELL))
 
     for f in features:
         blit_cell(f.sprite_key, f.pos)
