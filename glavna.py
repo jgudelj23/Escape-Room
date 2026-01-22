@@ -200,6 +200,17 @@ def nearest_sea_entry():
                 break
     return min(entries, key=lambda p: manhattan(player.pos, p)) if entries else None
 
+def can_enter(p: Pos):
+    global bridge_built
+    if is_sea(p) and not bridge_built:
+        if has_axe and has_wood:
+            bridge_built = True
+            popup.show("Most je izgrađen")
+            return True
+        popup.show("Treba ti sjekira i drvo za izgradnju mosta", 2200)
+        return False
+    return True
+
 def try_collect(p: Pos):
     global has_key, has_axe, has_wood, has_paper, mode
     if game_finished:
@@ -269,6 +280,8 @@ def move(dx: int, dy: int):
     if not game_map.in_bounds(np):
         return
     if not game_map.tile_at(np).walkable:
+        return
+    if not can_enter(np):
         return
     player.pos = np
     try_collect(player.pos)
