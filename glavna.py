@@ -248,30 +248,66 @@ def can_enter(p: Pos):
 
     return True
 
+auto_active = False
+auto_kind = None
+auto_targets = []
+auto_parent = {}
+auto_subpath = []
+auto_target = None
+auto_last_step = 0
+
+def stop_auto():
+    global auto_active, auto_kind, auto_targets, auto_parent, auto_subpath, auto_target
+    auto_active = False
+    auto_kind = None
+    auto_targets = []
+    auto_parent = {}
+    auto_subpath = []
+    auto_target = None
+
+def dfs_restart_from_here():
+    global auto_targets, auto_parent, auto_subpath, auto_target, auto_last_step
+    if not auto_active or auto_kind != "dfs":
+        return
+    order, parent = dfs_tree(player.pos)
+    auto_targets, auto_parent = order[:], parent
+    auto_subpath, auto_target = [], None
+    auto_last_step = pygame.time.get_ticks()
+
 def try_collect(p: Pos):
     global has_key, has_axe, has_wood, has_paper, mode, code_input
     if game_finished:
         return
+
     f = feat_at.get(p)
     if not f:
         return
+
+    def on_change():
+        if auto_active and auto_kind == "dfs":
+            dfs_restart_from_here()
+        if auto_active and auto_kind == "astar":
+            astar_replan()
 
     if isinstance(f, Key):
         has_key = True
         remove_feature(f)
         popup.show("Ključ pokupljen")
+        on_change()
         return
 
     if isinstance(f, Axe):
         has_axe = True
         remove_feature(f)
         popup.show("Sjekira pokupljena")
+        on_change()
         return
 
     if isinstance(f, Paper):
         has_paper = True
         remove_feature(f)
         mode = MODE_PAPER
+        on_change()
         return
 
     if isinstance(f, Tree):
@@ -281,6 +317,7 @@ def try_collect(p: Pos):
         has_wood = True
         remove_feature(f)
         popup.show("Posijekao si drvo za most")
+        on_change()
         return
 
     if isinstance(f, Terminal):
@@ -303,6 +340,154 @@ def try_collect(p: Pos):
         start_exit_animation()
         finish_game()
         return
+
+def passable_plan(p: Pos):
+    f = feat_at.get(p)
+    if isinstance(f, Door) and not has_key:
+        return False
+    if isinstance(f, Bars) and not terminal_unlocked:
+        return False
+    if is_sea(p) and not bridge_built:
+        return bool(has_axe and has_wood)
+    return True
+
+def astar_path(start: Pos, goal: Pos):
+    if start == goal:
+        return []
+    open_set = {start}
+    came = {}
+    g = {start: 0}
+    f = {start: manhattan(start, goal)}
+
+    while open_set:
+        cur = min(open_set, key=lambda p: f.get(p, INF))
+        if cur == goal:
+            out = []
+            x = goal
+            while x != start:
+                out.append(x)
+                x = came[x]
+            out.reverse()
+            return out
+
+        open_set.remove(cur)
+        for nb in graf.get(cur, []):
+            if not passable_plan(nb):
+                continue
+            tg = g[cur] + 1
+            if tg < g.get(nb, INF):
+                came[nb] = cur
+                g[nb] = tg
+                f[nb] = tg + manhattan(nb, goal)
+                open_set.add(nb)
+    return []
+
+def start_auto(kind: str):
+    global auto_active, auto_kind, auto_targets, auto_parent, auto_subpath, auto_target, auto_last_step
+    if kind == "bfs":
+        order, parent = bfs_tree(player.pos)
+    else:
+        order, parent = dfs_tree(player.pos)
+    auto_active, auto_kind = True, kind
+    auto_targets, auto_parent = order[:], parent
+    auto_subpath, auto_target = [], None
+    auto_last_step = pygame.time.get_ticks()
+
+def astar_next_goal():
+    if not has_key:
+        return nearest(Key)
+    d = find_first(Door)
+    if d is not None:
+        return d
+    if not has_paper:
+        return nearest(Paper)
+    if not has_axe:
+        return nearest(Axe)
+    if not has_wood:
+        return nearest(Tree)
+    if not bridge_built:
+        return nearest_sea_entry()
+    if not terminal_unlocked:
+        return nearest(Terminal)
+    return find_first(Exit)
+
+def astar_replan():
+    global auto_subpath, auto_target
+    if not auto_active or auto_kind != "astar":
+        return
+    goal = astar_next_goal()
+    if goal is None:
+        popup.show("Nema cilja na mapi")
+        stop_auto()
+        return
+    path = astar_path(player.pos, goal)
+    if not path:
+        stop_auto()
+        return
+    auto_subpath, auto_target = path[:], goal
+
+def start_auto_astar():
+    global auto_active, auto_kind, auto_subpath, auto_target, auto_last_step
+    auto_active, auto_kind = True, "astar"
+    auto_subpath, auto_target = [], None
+    auto_last_step = pygame.time.get_ticks()
+    popup.show("A* pretraživanje", 1500)
+    astar_replan()
+
+def update_auto():
+    global auto_last_step, auto_subpath, auto_target
+
+    if game_finished or not auto_active or mode != MODE_PLAY:
+        return
+
+    now = pygame.time.get_ticks()
+    if now - auto_last_step < AUTO_STEP_MS:
+        return
+    auto_last_step = now
+
+    if auto_kind == "astar":
+        if not auto_subpath:
+            astar_replan()
+            if not auto_subpath:
+                return
+
+        nxt = auto_subpath[0]
+        if not can_enter(nxt):
+            astar_replan()
+            return
+
+        auto_subpath.pop(0)
+        player.pos = nxt
+        try_collect(player.pos)
+
+        if auto_target == player.pos and auto_active and auto_kind == "astar":
+            astar_replan()
+        return
+
+    while not auto_subpath:
+        if not auto_targets:
+            stop_auto()
+            return
+        t = auto_targets.pop(0)
+        if t == player.pos:
+            continue
+        auto_target = t
+        auto_subpath = tree_path_between(player.pos, t, auto_parent)
+        if not auto_subpath:
+            auto_target = None
+
+    nxt = auto_subpath[0]
+    if not can_enter(nxt):
+        if auto_target is not None:
+            auto_targets.append(auto_target)
+        auto_subpath, auto_target = [], None
+        return
+
+    auto_subpath.pop(0)
+    player.pos = nxt
+    try_collect(player.pos)
+    if auto_target == player.pos:
+        auto_target = None
 
 def draw_dim(alpha=190):
     s = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
@@ -360,70 +545,6 @@ def draw_exit():
         p[4] *= 0.995
         pygame.draw.circle(screen, (255, 255, 255), (int(p[0]), int(p[1])), max(1, int(3 * p[4])))
 
-auto_active = False
-auto_kind = None
-auto_targets = []
-auto_parent = {}
-auto_subpath = []
-auto_target = None
-auto_last_step = 0
-
-def stop_auto():
-    global auto_active, auto_kind, auto_targets, auto_parent, auto_subpath, auto_target
-    auto_active = False
-    auto_kind = None
-    auto_targets = []
-    auto_parent = {}
-    auto_subpath = []
-    auto_target = None
-
-def start_auto(kind: str):
-    global auto_active, auto_kind, auto_targets, auto_parent, auto_subpath, auto_target, auto_last_step
-    if kind == "bfs":
-        order, parent = bfs_tree(player.pos)
-    else:
-        order, parent = dfs_tree(player.pos)
-    auto_active, auto_kind = True, kind
-    auto_targets, auto_parent = order[:], parent
-    auto_subpath, auto_target = [], None
-    auto_last_step = pygame.time.get_ticks()
-
-def update_auto():
-    global auto_last_step, auto_subpath, auto_target
-
-    if game_finished or not auto_active or mode != MODE_PLAY:
-        return
-
-    now = pygame.time.get_ticks()
-    if now - auto_last_step < AUTO_STEP_MS:
-        return
-    auto_last_step = now
-
-    while not auto_subpath:
-        if not auto_targets:
-            stop_auto()
-            return
-        t = auto_targets.pop(0)
-        if t == player.pos:
-            continue
-        auto_target = t
-        auto_subpath = tree_path_between(player.pos, t, auto_parent)
-        if not auto_subpath:
-            auto_target = None
-
-    nxt = auto_subpath[0]
-    if not can_enter(nxt):
-        if auto_target is not None:
-            auto_targets.append(auto_target)
-        auto_subpath, auto_target = [], None
-        return
-
-    auto_subpath.pop(0)
-    player.pos = nxt
-    try_collect(player.pos)
-    if auto_target == player.pos:
-        auto_target = None
-
 def move(dx: int, dy: int):
     if mode != MODE_PLAY or game_finished:
         return
@@ -464,6 +585,8 @@ while running:
                 start_auto("bfs")
             elif e.key == pygame.K_2:
                 start_auto("dfs")
+            elif e.key == pygame.K_3:
+                start_auto_astar()
 
         if e.key in (
             pygame.K_w, pygame.K_UP, pygame.K_s, pygame.K_DOWN,
@@ -482,6 +605,8 @@ while running:
                     terminal_unlocked = True
                     popup.show("Uspješno upisana lozinka. Rešetka je podignuta")
                     mode = MODE_PLAY
+                    if auto_active and auto_kind == "astar":
+                        astar_replan()
                 else:
                     popup.show("Kriva lozinka, pokušaj opet", 1700)
                     code_input = ""
