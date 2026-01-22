@@ -200,8 +200,26 @@ def nearest_sea_entry():
                 break
     return min(entries, key=lambda p: manhattan(player.pos, p)) if entries else None
 
+def start_exit_animation():
+    global mode, exit_start_ms, confetti
+    mode = MODE_EXIT
+    exit_start_ms = pygame.time.get_ticks()
+    confetti = []
+    cx = player.pos.x * CELL + CELL // 2
+    cy = player.pos.y * CELL + CELL // 2
+    for _ in range(160):
+        confetti.append([cx, cy, random.uniform(-3.2, 3.2), random.uniform(-5.0, -1.2), random.uniform(0.5, 1.2)])
+
+def finish_game():
+    global game_finished
+    game_finished = True
+    popup.show("Kraj", 4000)
+
 def can_enter(p: Pos):
     global bridge_built
+    if game_finished:
+        return False
+
     f = feat_at.get(p)
 
     if isinstance(f, Door):
@@ -249,6 +267,12 @@ def try_collect(p: Pos):
         popup.show("Sjekira pokupljena")
         return
 
+    if isinstance(f, Paper):
+        has_paper = True
+        remove_feature(f)
+        mode = MODE_PAPER
+        return
+
     if isinstance(f, Tree):
         if not has_axe:
             popup.show("Treba ti sjekira da posiječeš drvo")
@@ -256,12 +280,6 @@ def try_collect(p: Pos):
         has_wood = True
         remove_feature(f)
         popup.show("Posijekao si drvo za most")
-        return
-
-    if isinstance(f, Paper):
-        has_paper = True
-        remove_feature(f)
-        mode = MODE_PAPER
         return
 
     if isinstance(f, Terminal):
@@ -278,6 +296,11 @@ def try_collect(p: Pos):
 
     if isinstance(f, Bars):
         popup.show("Rešetka je spuštena. Upiši šifru")
+        return
+
+    if isinstance(f, Exit):
+        start_exit_animation()
+        finish_game()
         return
 
 def draw_dim(alpha=190):
@@ -313,6 +336,28 @@ def draw_code():
     shown = code_input + ("_" if (pygame.time.get_ticks() // 300) % 2 == 0 else "")
     screen.blit(F(46).render(shown, True, (255, 255, 255)), (20, 80))
     screen.blit(F(24).render("ENTER potvrdi | BACKSPACE briše | ESC izlaz", True, (255, 255, 255)), (20, 140))
+
+def update_exit_animation():
+    if game_finished:
+        return
+    global mode
+    if pygame.time.get_ticks() - exit_start_ms >= 2600:
+        mode = MODE_PLAY
+        popup.show("Bravo, uspješno si pronašao izlaz iz ecsape room-a", 2600)
+
+def draw_exit():
+    t = pygame.time.get_ticks() - exit_start_ms
+    if t < 550:
+        a = int(210 * (1.0 - t / 550.0))
+        flash = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        flash.fill((255, 255, 255, a))
+        screen.blit(flash, (0, 0))
+    for p in confetti:
+        p[0] += p[2]
+        p[1] += p[3]
+        p[3] += 0.14
+        p[4] *= 0.995
+        pygame.draw.circle(screen, (255, 255, 255), (int(p[0]), int(p[1])), max(1, int(3 * p[4])))
 
 def move(dx: int, dy: int):
     if mode != MODE_PLAY or game_finished:
@@ -375,6 +420,9 @@ while running:
         elif e.key in (pygame.K_d, pygame.K_RIGHT):
             move(1, 0)
 
+    if mode == MODE_EXIT:
+        update_exit_animation()
+
     draw_tiles()
 
     img = bridge_big if bridge_built else sea_big
@@ -389,6 +437,8 @@ while running:
         draw_paper()
     elif mode == MODE_CODE:
         draw_code()
+    elif mode == MODE_EXIT:
+        draw_exit()
 
     popup.draw(screen)
 
