@@ -52,11 +52,28 @@ def draw_tiles():
             pygame.draw.rect(screen, color, r)
             pygame.draw.rect(screen, GRID_COLOR, r, 1)
 
+def move(dx, dy):
+    np = Pos(player.pos.x + dx, player.pos.y + dy)
+    if not game_map.in_bounds(np):
+        return
+    if not game_map.tile_at(np).walkable:
+        return
+    player.pos = np
+
 running = True
 while running:
     for e in pygame.event.get():
         if e.type == pygame.QUIT:
             running = False
+        elif e.type == pygame.KEYDOWN:
+            if e.key in (pygame.K_w, pygame.K_UP):
+                move(0, -1)
+            elif e.key in (pygame.K_s, pygame.K_DOWN):
+                move(0, 1)
+            elif e.key in (pygame.K_a, pygame.K_LEFT):
+                move(-1, 0)
+            elif e.key in (pygame.K_d, pygame.K_RIGHT):
+                move(1, 0)
 
     draw_tiles()
 
