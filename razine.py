@@ -1,5 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from typing import ClassVar, Iterable
 
 @dataclass(frozen=True, slots=True)
 class Pos:
@@ -12,3 +13,38 @@ class Tile:
 
 WALL = Tile(False)
 FLOOR = Tile(True)
+
+class MapBuilder:
+    def __init__(self, w: int, h: int):
+        self.w, self.h = w, h
+        self.walkable: set[Pos] = set()
+
+    def add(self, p: Pos) -> None:
+        if 0 <= p.x < self.w and 0 <= p.y < self.h:
+            self.walkable.add(p)
+
+    def add_cells(self, *cells: Pos):
+        for c in cells:
+            self.add(c)
+        return self
+
+    def add_vertical(self, x: int, y0: int, y1: int):
+        for y in range(y0, y1 + 1):
+            self.add(Pos(x, y))
+        return self
+
+    def add_horizontal(self, y: int, x0: int, x1: int):
+        for x in range(x0, x1 + 1):
+            self.add(Pos(x, y))
+        return self
+
+class GameMap:
+    def __init__(self, w: int, h: int, walkable: set[Pos]):
+        self.w, self.h = w, h
+        self.walkable = walkable
+
+    def tile_at(self, p: Pos) -> Tile:
+        return FLOOR if p in self.walkable else WALL
+
+    def in_bounds(self, p: Pos) -> bool:
+        return 0 <= p.x < self.w and 0 <= p.y < self.h
