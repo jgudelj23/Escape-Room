@@ -2,7 +2,7 @@ import pygame
 from pathlib import Path
 from collections import deque
 
-from razine import Pos, GameMap, build_walkable, build_level, Paper
+from razine import Pos, GameMap, build_walkable, build_level, Feature, Paper
 
 pygame.init()
 
@@ -88,6 +88,12 @@ player, features, sea, start_pos = build_level()
 sea_big = scale_sprite(sprites.get("voda"), sea.width_cells, sea.height_cells)
 bridge_big = scale_sprite(sprites.get("most"), sea.width_cells, sea.height_cells)
 
+feat_at = {f.pos: f for f in features}
+def remove_feature(f: Feature):
+    if f in features:
+        features.remove(f)
+        feat_at.pop(f.pos, None)
+
 mode = MODE_PLAY
 has_paper = False
 bridge_built = False
@@ -103,12 +109,11 @@ def draw_tiles():
 
 def try_collect():
     global mode, has_paper
-    for f in features[:]:
-        if f.pos == player.pos and isinstance(f, Paper):
-            features.remove(f)
-            has_paper = True
-            mode = MODE_PAPER
-            return
+    f = feat_at.get(player.pos)
+    if f and isinstance(f, Paper):
+        remove_feature(f)
+        has_paper = True
+        mode = MODE_PAPER
 
 def move(dx, dy):
     if mode != MODE_PLAY:
