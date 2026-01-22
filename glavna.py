@@ -213,6 +213,7 @@ def start_exit_animation():
 def finish_game():
     global game_finished
     game_finished = True
+    stop_auto()
     popup.show("Kraj", 4000)
 
 def can_enter(p: Pos):
@@ -359,6 +360,70 @@ def draw_exit():
         p[4] *= 0.995
         pygame.draw.circle(screen, (255, 255, 255), (int(p[0]), int(p[1])), max(1, int(3 * p[4])))
 
+auto_active = False
+auto_kind = None
+auto_targets = []
+auto_parent = {}
+auto_subpath = []
+auto_target = None
+auto_last_step = 0
+
+def stop_auto():
+    global auto_active, auto_kind, auto_targets, auto_parent, auto_subpath, auto_target
+    auto_active = False
+    auto_kind = None
+    auto_targets = []
+    auto_parent = {}
+    auto_subpath = []
+    auto_target = None
+
+def start_auto(kind: str):
+    global auto_active, auto_kind, auto_targets, auto_parent, auto_subpath, auto_target, auto_last_step
+    if kind == "bfs":
+        order, parent = bfs_tree(player.pos)
+    else:
+        order, parent = dfs_tree(player.pos)
+    auto_active, auto_kind = True, kind
+    auto_targets, auto_parent = order[:], parent
+    auto_subpath, auto_target = [], None
+    auto_last_step = pygame.time.get_ticks()
+
+def update_auto():
+    global auto_last_step, auto_subpath, auto_target
+
+    if game_finished or not auto_active or mode != MODE_PLAY:
+        return
+
+    now = pygame.time.get_ticks()
+    if now - auto_last_step < AUTO_STEP_MS:
+        return
+    auto_last_step = now
+
+    while not auto_subpath:
+        if not auto_targets:
+            stop_auto()
+            return
+        t = auto_targets.pop(0)
+        if t == player.pos:
+            continue
+        auto_target = t
+        auto_subpath = tree_path_between(player.pos, t, auto_parent)
+        if not auto_subpath:
+            auto_target = None
+
+    nxt = auto_subpath[0]
+    if not can_enter(nxt):
+        if auto_target is not None:
+            auto_targets.append(auto_target)
+        auto_subpath, auto_target = [], None
+        return
+
+    auto_subpath.pop(0)
+    player.pos = nxt
+    try_collect(player.pos)
+    if auto_target == player.pos:
+        auto_target = None
+
 def move(dx: int, dy: int):
     if mode != MODE_PLAY or game_finished:
         return
@@ -391,6 +456,21 @@ while running:
                 running = False
             continue
 
+        if game_finished:
+            continue
+
+        if mode == MODE_PLAY:
+            if e.key == pygame.K_1:
+                start_auto("bfs")
+            elif e.key == pygame.K_2:
+                start_auto("dfs")
+
+        if e.key in (
+            pygame.K_w, pygame.K_UP, pygame.K_s, pygame.K_DOWN,
+            pygame.K_a, pygame.K_LEFT, pygame.K_d, pygame.K_RIGHT
+        ) and auto_active:
+            stop_auto()
+
         if mode == MODE_PAPER:
             if e.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_KP_ENTER):
                 mode = MODE_PLAY
@@ -411,14 +491,17 @@ while running:
                 code_input += e.unicode
             continue
 
-        if e.key in (pygame.K_w, pygame.K_UP):
-            move(0, -1)
-        elif e.key in (pygame.K_s, pygame.K_DOWN):
-            move(0, 1)
-        elif e.key in (pygame.K_a, pygame.K_LEFT):
-            move(-1, 0)
-        elif e.key in (pygame.K_d, pygame.K_RIGHT):
-            move(1, 0)
+        if mode == MODE_PLAY:
+            if e.key in (pygame.K_w, pygame.K_UP):
+                move(0, -1)
+            elif e.key in (pygame.K_s, pygame.K_DOWN):
+                move(0, 1)
+            elif e.key in (pygame.K_a, pygame.K_LEFT):
+                move(-1, 0)
+            elif e.key in (pygame.K_d, pygame.K_RIGHT):
+                move(1, 0)
+
+    update_auto()
 
     if mode == MODE_EXIT:
         update_exit_animation()
