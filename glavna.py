@@ -548,6 +548,15 @@ def draw_tiles():
             pygame.draw.rect(screen, color, r)
             pygame.draw.rect(screen, GRID_COLOR, r, 1)
 
+def draw_world():
+    draw_tiles()
+    img = bridge_big if bridge_built else sea_big
+    if img:
+        screen.blit(img, (sea.top_left.x * CELL, sea.top_left.y * CELL))
+    for f in features:
+        blit_cell(f.sprite_key, f.pos)
+    blit_cell("igrac", player.pos)
+
 def draw_paper():
     draw_dim()
     sw, sh = screen.get_size()
@@ -680,15 +689,7 @@ while running:
     if mode == MODE_EXIT:
         update_exit_animation()
 
-    draw_tiles()
-
-    img = bridge_big if bridge_built else sea_big
-    if img:
-        screen.blit(img, (sea.top_left.x * CELL, sea.top_left.y * CELL))
-
-    for f in features:
-        blit_cell(f.sprite_key, f.pos)
-    blit_cell("igrac", player.pos)
+    draw_world()
 
     if mode == MODE_PAPER:
         draw_paper()
