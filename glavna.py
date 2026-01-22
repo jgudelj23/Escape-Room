@@ -202,6 +202,16 @@ def nearest_sea_entry():
 
 def can_enter(p: Pos):
     global bridge_built
+    f = feat_at.get(p)
+
+    if isinstance(f, Door):
+        if not has_key:
+            popup.show("Vrata su zaključana")
+            return False
+        remove_feature(f)
+        popup.show("Vrata su otključana")
+        return True
+
     if is_sea(p) and not bridge_built:
         if has_axe and has_wood:
             bridge_built = True
@@ -209,6 +219,7 @@ def can_enter(p: Pos):
             return True
         popup.show("Treba ti sjekira i drvo za izgradnju mosta", 2200)
         return False
+
     return True
 
 def try_collect(p: Pos):
