@@ -72,7 +72,7 @@ def scale_sprite(surf, wc, hc):
 
 sprites = {k: load_sprite(k) for k in (
     "igrac", "vrata", "kljuc", "sjekira", "terminal", "resetke",
-    "papir", "zastava", "drvo", "voda", "most"
+    "papir", "papirus", "zastava", "drvo", "voda", "most"
 )}
 
 paper_original = None
@@ -554,7 +554,10 @@ def draw_world():
     if img:
         screen.blit(img, (sea.top_left.x * CELL, sea.top_left.y * CELL))
     for f in features:
-        blit_cell(f.sprite_key, f.pos)
+        if isinstance(f, Paper):
+            blit_cell("papirus", f.pos)
+        else:
+            blit_cell(f.sprite_key, f.pos)
     blit_cell("igrac", player.pos)
 
 def draw_paper():
@@ -704,5 +707,3 @@ while running:
     clock.tick(60)
 
 pygame.quit()
-
-#test
