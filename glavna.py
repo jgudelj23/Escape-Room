@@ -1,19 +1,28 @@
 import pygame
 from pathlib import Path
-from razine import Pos, GameMap, build_walkable, build_level, Key
+from collections import deque
+
+from razine import Pos, GameMap, build_walkable, build_level, Paper
 
 pygame.init()
 
 CELL = 40
 W, H = 11, 17
-
-screen = pygame.display.set_mode((W * CELL, H * CELL))
-pygame.display.set_caption("Escape Room")
-clock = pygame.time.Clock()
+SECRET_CODE = "2004"
 
 COLOR_WALK = (255, 255, 255)
 COLOR_WALL = (55, 55, 55)
 GRID_COLOR = (0, 0, 0)
+
+MODE_PLAY, MODE_PAPER, MODE_CODE, MODE_EXIT = "play", "paper", "code", "exit"
+AUTO_STEP_MS = 70
+AUTO_CODE_STEP_MS = 260
+DIRS4 = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+INF = 10**9
+
+screen = pygame.display.set_mode((W * CELL, H * CELL))
+pygame.display.set_caption("Escape Room")
+clock = pygame.time.Clock()
 
 class Popup:
     def __init__(self):
@@ -21,11 +30,11 @@ class Popup:
         self.until = 0
         self.font = pygame.font.SysFont(None, 26)
 
-    def show(self, text, ms=1700):
+    def show(self, text: str, ms: int = 1700):
         self.text = text
         self.until = pygame.time.get_ticks() + ms
 
-    def draw(self, surf):
+    def draw(self, surf: pygame.Surface):
         if not (self.text and pygame.time.get_ticks() < self.until):
             return
         pad = 12
@@ -38,6 +47,12 @@ class Popup:
         surf.blit(txt, (x + pad, y + pad))
 
 popup = Popup()
+
+_fonts = {}
+def F(size: int):
+    if size not in _fonts:
+        _fonts[size] = pygame.font.SysFont(None, size)
+    return _fonts[size]
 
 asset_dir = Path(__file__).parent / "slike"
 
@@ -56,6 +71,11 @@ sprites = {k: load_sprite(k) for k in (
     "papir", "zastava", "drvo", "voda", "most"
 )}
 
+paper_original = None
+pp = asset_dir / "papir.png"
+if pp.exists():
+    paper_original = pygame.image.load(str(pp)).convert_alpha()
+
 def blit_cell(key, p: Pos):
     spr = sprites.get(key)
     if spr:
@@ -67,7 +87,8 @@ player, features, sea, start_pos = build_level()
 
 sea_big = scale_sprite(sprites.get("voda"), sea.width_cells, sea.height_cells)
 
-has_key = False
+mode = MODE_PLAY
+has_paper = False
 
 def draw_tiles():
     for y in range(H):
@@ -79,37 +100,75 @@ def draw_tiles():
             pygame.draw.rect(screen, GRID_COLOR, r, 1)
 
 def try_collect():
-    global has_key
+    global mode, has_paper
     for f in features[:]:
-        if f.pos == player.pos and isinstance(f, Key):
+        if f.pos == player.pos and isinstance(f, Paper):
             features.remove(f)
-            has_key = True
-            popup.show("Uzeo si ključ")
+            has_paper = True
+            mode = MODE_PAPER
+            return
 
 def move(dx, dy):
+    if mode != MODE_PLAY:
+        return
     np = Pos(player.pos.x + dx, player.pos.y + dy)
     if not game_map.in_bounds(np):
         return
     if not game_map.tile_at(np).walkable:
-        popup.show("Ne možeš proći")
         return
     player.pos = np
     try_collect()
+
+def draw_dim(alpha=190):
+    s = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+    s.fill((0, 0, 0, alpha))
+    screen.blit(s, (0, 0))
+
+def draw_paper():
+    draw_dim()
+    sw, sh = screen.get_size()
+    if paper_original is None:
+        screen.blit(F(26).render("papir.png nije pronađen", True, (255, 255, 255)), (20, 20))
+        return
+    iw, ih = paper_original.get_size()
+    sc = min((sw * 0.92) / iw, (sh * 0.92) / ih)
+    nw, nh = int(iw * sc), int(ih * sc)
+    big = pygame.transform.scale(paper_original, (nw, nh))
+    screen.blit(big, ((sw - nw) // 2, (sh - nh) // 2))
+    screen.blit(F(26).render("SPACE/ENTER/ESC za zatvoriti", True, (255, 255, 255)), (20, sh - 30))
+
+try_collect()
 
 running = True
 while running:
     for e in pygame.event.get():
         if e.type == pygame.QUIT:
             running = False
-        elif e.type == pygame.KEYDOWN:
-            if e.key in (pygame.K_w, pygame.K_UP):
-                move(0, -1)
-            elif e.key in (pygame.K_s, pygame.K_DOWN):
-                move(0, 1)
-            elif e.key in (pygame.K_a, pygame.K_LEFT):
-                move(-1, 0)
-            elif e.key in (pygame.K_d, pygame.K_RIGHT):
-                move(1, 0)
+            break
+
+        if e.type != pygame.KEYDOWN:
+            continue
+
+        if e.key == pygame.K_ESCAPE:
+            if mode == MODE_PAPER:
+                mode = MODE_PLAY
+            else:
+                running = False
+            continue
+
+        if mode == MODE_PAPER:
+            if e.key in (pygame.K_SPACE, pygame.K_RETURN, pygame.K_KP_ENTER):
+                mode = MODE_PLAY
+            continue
+
+        if e.key in (pygame.K_w, pygame.K_UP):
+            move(0, -1)
+        elif e.key in (pygame.K_s, pygame.K_DOWN):
+            move(0, 1)
+        elif e.key in (pygame.K_a, pygame.K_LEFT):
+            move(-1, 0)
+        elif e.key in (pygame.K_d, pygame.K_RIGHT):
+            move(1, 0)
 
     draw_tiles()
 
@@ -119,6 +178,9 @@ while running:
     for f in features:
         blit_cell(f.sprite_key, f.pos)
     blit_cell("igrac", player.pos)
+
+    if mode == MODE_PAPER:
+        draw_paper()
 
     popup.draw(screen)
 

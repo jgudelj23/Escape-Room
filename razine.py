@@ -48,6 +48,7 @@ class GameMap:
 
     def in_bounds(self, p: Pos) -> bool:
         return 0 <= p.x < self.w and 0 <= p.y < self.h
+
 def build_walkable() -> set[Pos]:
     W, H = 11, 17
     b = MapBuilder(W, H)
@@ -75,6 +76,7 @@ def build_walkable() -> set[Pos]:
     b.add_horizontal(15, 7, 10)
 
     return b.walkable
+
 class Feature:
     sprite_key: ClassVar[str] = ""
     def __init__(self, pos: Pos):
