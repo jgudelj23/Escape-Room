@@ -15,6 +15,30 @@ COLOR_WALK = (255, 255, 255)
 COLOR_WALL = (55, 55, 55)
 GRID_COLOR = (0, 0, 0)
 
+class Popup:
+    def __init__(self):
+        self.text = ""
+        self.until = 0
+        self.font = pygame.font.SysFont(None, 26)
+
+    def show(self, text, ms=1700):
+        self.text = text
+        self.until = pygame.time.get_ticks() + ms
+
+    def draw(self, surf):
+        if not (self.text and pygame.time.get_ticks() < self.until):
+            return
+        pad = 12
+        txt = self.font.render(self.text, True, (255, 255, 255))
+        w, h = txt.get_width() + pad * 2, txt.get_height() + pad * 2
+        x, y = (surf.get_width() - w) // 2, 10
+        r = pygame.Rect(x, y, w, h)
+        pygame.draw.rect(surf, (20, 20, 20), r, border_radius=10)
+        pygame.draw.rect(surf, (255, 255, 255), r, 2, border_radius=10)
+        surf.blit(txt, (x + pad, y + pad))
+
+popup = Popup()
+
 asset_dir = Path(__file__).parent / "slike"
 
 def load_sprite(name):
@@ -57,6 +81,7 @@ def move(dx, dy):
     if not game_map.in_bounds(np):
         return
     if not game_map.tile_at(np).walkable:
+        popup.show("Ne možeš proći")
         return
     player.pos = np
 
@@ -83,6 +108,8 @@ while running:
     for f in features:
         blit_cell(f.sprite_key, f.pos)
     blit_cell("igrac", player.pos)
+
+    popup.draw(screen)
 
     pygame.display.flip()
     clock.tick(60)
