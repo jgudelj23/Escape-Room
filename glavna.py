@@ -24,6 +24,9 @@ def load_sprite(name):
     img = pygame.image.load(str(fp)).convert_alpha()
     return pygame.transform.smoothscale(img, (CELL, CELL))
 
+def scale_sprite(surf, wc, hc):
+    return None if surf is None else pygame.transform.smoothscale(surf, (CELL * wc, CELL * hc))
+
 sprites = {k: load_sprite(k) for k in (
     "igrac", "vrata", "kljuc", "sjekira", "terminal", "resetke",
     "papir", "zastava", "drvo", "voda", "most"
@@ -37,6 +40,8 @@ def blit_cell(key, p: Pos):
 walkable = build_walkable()
 game_map = GameMap(W, H, walkable)
 player, features, sea, start_pos = build_level()
+
+sea_big = scale_sprite(sprites.get("voda"), sea.width_cells, sea.height_cells)
 
 def draw_tiles():
     for y in range(H):
@@ -54,6 +59,10 @@ while running:
             running = False
 
     draw_tiles()
+
+    if sea_big:
+        screen.blit(sea_big, (sea.top_left.x * CELL, sea.top_left.y * CELL))
+
     for f in features:
         blit_cell(f.sprite_key, f.pos)
     blit_cell("igrac", player.pos)
