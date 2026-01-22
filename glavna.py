@@ -212,6 +212,13 @@ def can_enter(p: Pos):
         popup.show("Vrata su otključana")
         return True
 
+    if isinstance(f, Bars):
+        if terminal_unlocked:
+            remove_feature(f)
+            return True
+        popup.show("Rešetka je spuštena. Upiši šifru")
+        return False
+
     if is_sea(p) and not bridge_built:
         if has_axe and has_wood:
             bridge_built = True
@@ -223,7 +230,7 @@ def can_enter(p: Pos):
     return True
 
 def try_collect(p: Pos):
-    global has_key, has_axe, has_wood, has_paper, mode
+    global has_key, has_axe, has_wood, has_paper, mode, code_input
     if game_finished:
         return
     f = feat_at.get(p)
@@ -257,6 +264,22 @@ def try_collect(p: Pos):
         mode = MODE_PAPER
         return
 
+    if isinstance(f, Terminal):
+        if not has_paper:
+            popup.show("Upiši šifru")
+            return
+        if terminal_unlocked:
+            popup.show("Terminal je već otključan.")
+            return
+        code_input = ""
+        mode = MODE_CODE
+        popup.show(f"Upiši šifru ({len(SECRET_CODE)} znamenke) i ENTER.", 2400)
+        return
+
+    if isinstance(f, Bars):
+        popup.show("Rešetka je spuštena. Upiši šifru")
+        return
+
 def draw_dim(alpha=190):
     s = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
     s.fill((0, 0, 0, alpha))
@@ -280,9 +303,16 @@ def draw_paper():
     iw, ih = paper_original.get_size()
     sc = min((sw * 0.92) / iw, (sh * 0.92) / ih)
     nw, nh = int(iw * sc), int(ih * sc)
-    big = pygame.transform.smoothscale(paper_original, (nw, nh))
+    big = pygame.transform.scale(paper_original, (nw, nh))
     screen.blit(big, ((sw - nw) // 2, (sh - nh) // 2))
     screen.blit(F(26).render("SPACE/ENTER/ESC za zatvoriti", True, (255, 255, 255)), (20, sh - 30))
+
+def draw_code():
+    draw_dim()
+    screen.blit(F(32).render("Upiši šifru", True, (255, 255, 255)), (20, 20))
+    shown = code_input + ("_" if (pygame.time.get_ticks() // 300) % 2 == 0 else "")
+    screen.blit(F(46).render(shown, True, (255, 255, 255)), (20, 80))
+    screen.blit(F(24).render("ENTER potvrdi | BACKSPACE briše | ESC izlaz", True, (255, 255, 255)), (20, 140))
 
 def move(dx: int, dy: int):
     if mode != MODE_PLAY or game_finished:
@@ -321,6 +351,21 @@ while running:
                 mode = MODE_PLAY
             continue
 
+        if mode == MODE_CODE:
+            if e.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                if code_input == SECRET_CODE:
+                    terminal_unlocked = True
+                    popup.show("Uspješno upisana lozinka. Rešetka je podignuta")
+                    mode = MODE_PLAY
+                else:
+                    popup.show("Kriva lozinka, pokušaj opet", 1700)
+                    code_input = ""
+            elif e.key == pygame.K_BACKSPACE:
+                code_input = code_input[:-1]
+            elif len(code_input) < len(SECRET_CODE) and e.unicode.isdigit():
+                code_input += e.unicode
+            continue
+
         if e.key in (pygame.K_w, pygame.K_UP):
             move(0, -1)
         elif e.key in (pygame.K_s, pygame.K_DOWN):
@@ -342,6 +387,8 @@ while running:
 
     if mode == MODE_PAPER:
         draw_paper()
+    elif mode == MODE_CODE:
+        draw_code()
 
     popup.draw(screen)
 
