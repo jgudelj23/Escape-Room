@@ -201,14 +201,24 @@ def nearest_sea_entry():
     return min(entries, key=lambda p: manhattan(player.pos, p)) if entries else None
 
 def try_collect(p: Pos):
-    global has_paper, mode
+    global has_key, has_paper, mode
     if game_finished:
         return
     f = feat_at.get(p)
+    if not f:
+        return
+
+    if isinstance(f, Key):
+        has_key = True
+        remove_feature(f)
+        popup.show("Ključ pokupljen")
+        return
+
     if isinstance(f, Paper):
         has_paper = True
         remove_feature(f)
         mode = MODE_PAPER
+        return
 
 def draw_dim(alpha=190):
     s = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
